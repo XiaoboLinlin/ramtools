@@ -39,6 +39,7 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
     V = V.to('m**3')
 
     cond = N / (V*kT) * q ** 2 * (D_cat + D_an)
+    
 
     return cond
 
@@ -81,8 +82,8 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
         try:
             trj = trj.atom_slice(trj.top.select(f'resname {cat_resname} {an_resname}'))
         except:
-            print("Not slicing trajectory")
-        M = dipole_moments_md(trj, q)
+            print("Not slicing trajectory")  
+        M = trj.xyz.transpose(0, 2, 1).dot(q_list) # calculate translational dipole moment based on center of mass positions.
         running_avg += [np.linalg.norm((M[i] - M[0]))**2 for i in range(len(M))]
 
     x = (trj_time - trj_time[0]).reshape(-1)
@@ -97,7 +98,7 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
     T *= u.Kelvin
 
     sigma = slope * (u.elementary_charge * u.nm) ** 2 / u.picosecond / (6 * V * kB * T)
-    seimens = u.second ** 3 * u.ampere ** 2 / (u.kilogram * u.meter ** 2)
+    seimens = (u.Ω)**(-1)
     sigma = sigma.to(seimens / u.meter)
 
     return sigma
