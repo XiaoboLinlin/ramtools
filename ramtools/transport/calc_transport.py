@@ -43,7 +43,7 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
 
     return cond
 
-def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chunk=200, cut= 0, q=1, T=300,
+def calc_eh_conductivity(trj_file, gro_file, V, cat_resname, an_resname, chunk=200, cut=0, q=1, T=300,
         skip=100):
     """ Calculate Einstein-Helfand conductivity
     Parameters
@@ -52,8 +52,6 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
         GROMACS trajectory
     gro_file : GROMACS gro file
         GROMACS coordinate file
-    N : int
-        Number of ions
     V : float
         Volume of simulation box
     cat_resname : str
@@ -82,7 +80,11 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
         try:
             trj = trj.atom_slice(trj.top.select(f'resname {cat_resname} {an_resname}'))
         except:
-            print("Not slicing trajectory")  
+            print("Not slicing trajectory")
+        total_n_il = trj.n_atoms
+        q_pos =np.array([q] * int(total_n_il/2))
+        q_neg = -1 * q_pos
+        q_list = np.append(q_pos, q_neg)
         M = trj.xyz.transpose(0, 2, 1).dot(q_list) # calculate translational dipole moment based on center of mass positions.
         running_avg += [np.linalg.norm((M[i] - M[0]))**2 for i in range(len(M))]
 
@@ -101,7 +103,7 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
     seimens = (u.Ω)**(-1)
     sigma = sigma.to(seimens / u.meter)
 
-    return sigma
+    return x, y, sigma
 
 
 def calc_hfshear(energy_file, trj, temperature):
