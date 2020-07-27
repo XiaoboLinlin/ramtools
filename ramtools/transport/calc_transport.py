@@ -43,7 +43,7 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
 
     return cond
 
-def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chunk=200, q=1, T=300,
+def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chunk=200, cut= 0, q=1, T=300,
         skip=100):
     """ Calculate Einstein-Helfand conductivity
     Parameters
@@ -91,7 +91,7 @@ def calc_eh_conductivity(trj_file, gro_file, N, V, cat_resname, an_resname, chun
 
     # TODO: Find where slope becomes linear
     slope, intercept, r_value, p_value, std_error = stats.linregress(
-            x, y)
+            x[cut:], y[cut:])
 
     kB = 1.38e-23 * u.joule / u.Kelvin
     V *= u.nm ** 3
