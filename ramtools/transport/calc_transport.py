@@ -44,7 +44,7 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
     return cond
 
 def calc_eh_conductivity(trj_file, gro_file, V, cat_resname, an_resname, chunk=200, cut=0, q=1, T=300,
-        skip=100):
+                         skip=100):
     """ Calculate Einstein-Helfand conductivity
     Parameters
     ----------
@@ -70,40 +70,46 @@ def calc_eh_conductivity(trj_file, gro_file, V, cat_resname, an_resname, chunk=2
     cond : unyt.array
         Einstein-Helfand conductivity
     """
+    overall_avg = list()
+    trj = md.load(trj_file, top=gro_file)
 
-    running_avg = np.zeros(chunk)
-    for i,trj in enumerate(md.iterload(trj_file, top=gro_file, chunk=chunk, skip=skip)):
-        if i == 0:
-            trj_time = trj.time
-        if trj.n_frames != chunk:
-            continue
-        try:
-            trj = trj.atom_slice(trj.top.select(f'resname {cat_resname} {an_resname}'))
-        except:
-            print("Not slicing trajectory")
-        total_n_il = trj.n_atoms
-        q_pos =np.array([q] * int(total_n_il/2))
-        q_neg = -1 * q_pos
-        q_list = np.append(q_pos, q_neg)
-        M = trj.xyz.transpose(0, 2, 1).dot(q_list) # calculate translational dipole moment based on center of mass positions.
-        running_avg += [np.linalg.norm((M[i] - M[0]))**2 for i in range(len(M))]
+    n_frames = trj.n_frames
+    for outer_chunk in range(2000, n_frames, 2000):
+        running_avg = np.zeros(chunk)
+        trj_outer_chunk = trj[outer_chunk-2000:outer_chunk]
+        for i, start_frame in enumerate(np.linspace(0, 2000, num=500, dtype=np.int)):
+            end_frame = start_frame + chunk
+            if end_frame < 2000:
+                trj_chunk = trj_outer_chunk[start_frame:end_frame]
+                if i == 0:
+                    trj_time = trj_chunk.time
+                trj_slice = trj_chunk.atom_slice(trj_chunk.top.select(f'resname {cat_resname} {an_resname}'))
+                total_n_il = trj_slice.n_atoms
+                q_pos = np.array([q] * int(total_n_il / 2))
+                q_neg = -1 * q_pos
+                q_list = np.append(q_pos, q_neg)
+                M = trj_slice.xyz.transpose(0, 2, 1).dot(q_list)
+                running_avg += [np.linalg.norm((M[i] - M[0])) ** 2 for i in range(len(M))]
+        y = running_avg / i
+        overall_avg.append(y)
 
     x = (trj_time - trj_time[0]).reshape(-1)
-    y = running_avg / i
-
-    # TODO: Find where slope becomes linear
-    slope, intercept, r_value, p_value, std_error = stats.linregress(
-            x[cut:], y[cut:])
-
+    sigma_all = list()
     kB = 1.38e-23 * u.joule / u.Kelvin
     V *= u.nm ** 3
     T *= u.Kelvin
+    for i in range(len(overall_avg)):
+        slope, intercept, r_value, p_value, std_error = stats.linregress(x[cut:], overall_avg[i][cut:])
+        sigma = slope * (u.elementary_charge * u.nm) ** 2 / u.picosecond / (6 * V * kB * T)
+        seimens = (u.Ω) ** (-1)
+        sigma = sigma.to(seimens / u.meter)
 
-    sigma = slope * (u.elementary_charge * u.nm) ** 2 / u.picosecond / (6 * V * kB * T)
-    seimens = (u.Ω)**(-1)
-    sigma = sigma.to(seimens / u.meter)
+        sigma_all.append(sigma)
+    std = np.std(sigma_all)
+    sigma_new = np.average(sigma_all)
+    y_new = np.average(overall_avg, axis =0)
 
-    return x, y, sigma
+    return x, y_new, sigma_new, std
 
 
 def calc_hfshear(energy_file, trj, temperature):
