@@ -6,7 +6,7 @@ from ramtools.utils.read_files import read_xvg
 from scipy import stats
 
 
-def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
+def calc_ne_conductivity(N, V, D_cat, D_cat_error, D_an, D_an_error, q=1, T=300):
     """ Calculate Nernst-Einstein Conductivity
 
     Parameters
@@ -17,8 +17,12 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
         Volume of simulation box in nm^3
     D_cat : float
         Diffusivity of cation in m^2/s
+    D_cat_error : float
+        The error of diffusivity of cation in m^2/s
     D_an : float
         Diffusivity of anion in m^2/s
+    D_an_error : float
+        The error of diffusivity of anion in m^2/s
     q : float, default=1
         Charge of ions in element charge units
     T : float, default=300
@@ -39,9 +43,8 @@ def calc_ne_conductivity(N, V, D_cat, D_an, q=1, T=300):
     V = V.to('m**3')
 
     cond = N / (V*kT) * q ** 2 * (D_cat + D_an)
-    
-
-    return cond
+    cond_error = N / (V*kT) * q ** 2 * np.sqrt(np.square(D_cat_error) + np.square(D_an_error))
+    return cond, cond_error
 
 def calc_eh_conductivity(trj_file, gro_file, V, cat_resname, an_resname, chunk=200, cut=0, q=1, T=300,
                          skip=100):
